@@ -66,6 +66,10 @@ pack_len:                     # consumed by the trainer's sample_packing, not us
 val_set_size: 0.05            # train/test split (axolotl val_set_size)
 
 benchmarks_to_decontaminate: [mmlu, gpqa, ifeval, gsm8k, math, aime]
+
+# tournament packaging (p11_chunk_tourn): slice each stage mix into N-row chunks,
+# each pre-split train/test, one chunk -> one tournament task.
+tourn_chunk_rows: 150000
 decontam:
   ngram: 8
   overlap_threshold: 0.6

@@ -67,6 +67,7 @@ class Config(BaseModel):
     benchmarks_to_decontaminate: list[str]
     decontam: DecontamCfg = Field(default_factory=DecontamCfg)
     stages: dict = Field(default_factory=dict)
+    tourn_chunk_rows: int = 150_000  # tournament packaging: rows per chunk
 
     @property
     def active_profile(self) -> Profile:
