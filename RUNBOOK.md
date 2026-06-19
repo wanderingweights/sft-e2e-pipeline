@@ -47,9 +47,15 @@ happens in Phase 6 so reasoning-on/off variants come from one record.
 ## PHASES
 
 **P0 `p00_env`** — venv + pinned `requirements.lock`; the **Quasar tokenizer
-loads**; `<think>`/`</think>` round-trip (add as special tokens if not single
-tokens — gate for Phase 8); record vocab. **+ measure tokens/sec** on the
-training rig to finalize `target_tokens`. *Done.*
+loads**; `<think>`/`</think>` round-trip; record vocab. **+ measure tokens/sec**
+on the training rig to finalize `target_tokens`.
+*Done (box 185.141.218.234): tokenizer loads, vocab 156,891. Findings:*
+- *`<think>`/`</think>` = **3 tokens each** → must be added as special tokens before
+  training (resize embeddings; new rows train in full-FT). Done in training yaml.*
+- *Quasar ships a **custom chat template** `<role>HUMAN</role>…<role>ASSISTANT</role>`
+  (bos `<|startoftext|>`, eos `<|endoftext|>`, pad = eos) — use `tokenizer_default`,
+  NOT chatml. Fixed in config + training yaml.*
+- *tokens/sec still TODO (needs the GPU rig, not this CPU box).*
 
 **P1 `p01_acquire`** — `snapshot_download` each source to `data/raw/<id>/`; record
 commit hash + row count. Source table below. On 3 failed retries: mark

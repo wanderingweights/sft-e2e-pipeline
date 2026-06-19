@@ -15,7 +15,7 @@ profiles:
     base_model: silx-ai/Quasar-Preview     # 18B total / 2B active MoE, quasar_long
     tokenizer_path: silx-ai/Quasar-Preview  # Quasar tokenizer, vocab 157,184
     trust_remote_code: true
-    chat_template: chatml                    # TODO Phase 0: confirm against Quasar tokenizer_config.json
+    chat_template: tokenizer_default         # P0: Quasar ships a CUSTOM template <role>HUMAN</role>…<role>ASSISTANT</role> (NOT chatml) — use the tokenizer's own
     think_open: "<think>"
     think_close: "</think>"
     adapter: none                            # full fine-tune, NO LoRA (training/base_quasar_fullft.yml)

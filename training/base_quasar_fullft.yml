@@ -17,7 +17,7 @@ load_in_4bit: false
 strict: false
 
 # --- data: one stage's S3 JSONL, ChatTemplate schema {conversations:[{from,value}]} ---
-chat_template: chatml                   # TODO Phase 0: confirm Quasar's real template
+chat_template: tokenizer_default        # P0: Quasar ships a custom <role>HUMAN/ASSISTANT</role> template; use the tokenizer's own (NOT chatml)
 datasets:
   - path: PLACEHOLDER_S3_URL_STAGE      # presigned MinIO url (re-sign from object key; 7-day max)
     ds_type: json
@@ -36,9 +36,11 @@ sample_packing: false                   # TODO verify packing works with Quasar 
 pad_to_sequence_len: true
 train_on_inputs: false                  # mask prompt; loss on outputs (incl. <think>) only
 
-# --- think tokens: add ONLY if Phase 0 shows they aren't already single tokens ---
-# special_tokens:
-# tokens: ["<think>", "</think>"]
+# --- think tokens: P0 confirmed <think>/</think> are 3 tokens each in Quasar's
+#     tokenizer -> add as specials (resizes embeddings; new rows train in full-FT) ---
+tokens:
+  - "<think>"
+  - "</think>"
 
 # --- optimization (full-FT values, not LoRA's 2e-4) ---
 gradient_accumulation_steps: 16
