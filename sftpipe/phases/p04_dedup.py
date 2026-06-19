@@ -31,7 +31,6 @@ HIGH_PRIORITY = {
 }
 
 _WORD = re.compile(r"\w+")
-_TEXTS: list[str] = []  # set in run(); workers inherit via fork (no pickling)
 
 
 def _text(rec: dict) -> str:
@@ -45,11 +44,11 @@ def _shingles(text: str) -> set[str]:
     return {" ".join(toks[i:i + SHINGLE_K]) for i in range(len(toks) - SHINGLE_K + 1)}
 
 
-def _sig(i: int):
-    """Worker: (md5, minhash-digest) for _TEXTS[i]."""
+def _sig(text: str):
+    """Worker: (md5, minhash-digest) for one record text. Texts are streamed in
+    (not held in RAM); only tiny signatures come back."""
     from datasketch import MinHash
 
-    text = _TEXTS[i]
     mh = MinHash(num_perm=NUM_PERM)
     for sh in _shingles(text):
         mh.update(sh.encode())
@@ -57,7 +56,6 @@ def _sig(i: int):
 
 
 def run(ctx: "Ctx") -> None:
-    global _TEXTS
     from datasketch import MinHash, MinHashLSH
 
     log = ctx.logger
@@ -66,23 +64,22 @@ def run(ctx: "Ctx") -> None:
     specs.sort(key=lambda s: 0 if s.id in HIGH_PRIORITY else 1)
 
     entries: list[tuple[str, int]] = []
-    texts: list[str] = []
-    for spec in specs:  # build in priority order
-        with open(clean / f"{spec.name}.jsonl") as f:
-            for idx, line in enumerate(f):
-                line = line.strip()
-                if not line:
-                    continue
-                entries.append((spec.name, idx))
-                texts.append(_text(json.loads(line)))
-    _TEXTS = texts
-    n_proc = cpu_count()
-    log.info("dedup: computing %d signatures on %d cores", len(texts), n_proc)
-    with Pool(n_proc) as pool:
-        sigs = pool.map(_sig, range(len(texts)), chunksize=4000)
-    _TEXTS = []  # free
 
-    log.info("dedup: serial LSH pass")
+    def text_stream():  # yields texts in priority order, recording entries as it goes
+        for spec in specs:
+            with open(clean / f"{spec.name}.jsonl") as f:
+                for idx, line in enumerate(f):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    entries.append((spec.name, idx))
+                    yield _text(json.loads(line))
+
+    n_proc = cpu_count()
+    log.info("dedup: streaming signatures through %d workers", n_proc)
+    with Pool(n_proc) as pool:
+        sigs = list(pool.imap(_sig, text_stream(), chunksize=2000))
+    log.info("dedup: %d signatures computed; serial LSH pass", len(sigs))
     lsh = MinHashLSH(threshold=THRESHOLD, num_perm=NUM_PERM)
     seen_exact: set[str] = set()
     keep: dict[str, set[int]] = defaultdict(set)
