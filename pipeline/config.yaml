@@ -75,8 +75,8 @@ decontam:
 stages:
   stage1:    # broad
     domain_ratios: {math: 0.26, reasoning: 0.24, code: 0.12, science: 0.06, chat: 0.27, if: 0.05}  # reasoning(=math+reasoning)~50%, chat~27%, code~12%, sci~6%, IF~5%
-  stage2:    # repair: IF/format + code/tool, with stage-1 replay to avoid forgetting
-    domain_ratios: {if: 0.45, code: 0.20, chat: 0.15, math: 0.10, reasoning: 0.10}
+  stage2:    # repair: IF/format + code/tool regressions, with stage-1 replay to avoid forgetting
+    domain_ratios: {code: 0.30, math: 0.15, reasoning: 0.15, chat: 0.16, if: 0.12, tool: 0.12}  # IF capped to persona-IF capacity (~12%)
     replay_stage1_fraction: 0.20
   stage3:    # polish: only these sources + hardest reasoning traces
     exclusive_sources: ["GAIR/LIMO", "simplescaling/s1K"]

@@ -82,6 +82,9 @@ SOURCES: list[SourceSpec] = [
                cols={"instruction": "instruction", "output": "output"}),
     SourceSpec(id="ise-uiuc/Magicoder-Evol-Instruct-110K", kind=Kind.instruct, domain=Domain.code,
                license="check-card", cols={"instruction": "instruction", "output": "response"}),
+    # Tool/function-calling for S2 tool regressions (conversations w/ tool defs in system turn).
+    SourceSpec(id="NousResearch/hermes-function-calling-v1", kind=Kind.sharegpt, domain=Domain.tool,
+               license="Apache-2.0", hf_config="func_calling", cols={"conversations": "conversations"}),
     SourceSpec(id="allenai/SciRIFF", kind=Kind.instruct, domain=Domain.science,
                license="ODC-BY", hf_config="4096", max_rows=10_000,
                cols={"instruction": "input", "output": "output"}),

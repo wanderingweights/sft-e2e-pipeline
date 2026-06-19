@@ -16,6 +16,8 @@ _FROM_MAP = {
     "human": Role.user, "user": Role.user,
     "gpt": Role.assistant, "assistant": Role.assistant, "chatgpt": Role.assistant,
     "system": Role.system,
+    # tool/function-call turns -> treat tool output as a user turn (no native tool role)
+    "tool": Role.user, "function": Role.user, "observation": Role.user, "function_response": Role.user,
 }
 _ROLE_MAP = {"user": Role.user, "assistant": Role.assistant, "system": Role.system, "tool": Role.user}
 
