@@ -148,3 +148,25 @@ batch is memory-tight because full-FT state for 18B params is ~288 GB.
 - **WandB: online, not silent.** Remove the trainer's `wandb_mode: offline`
   (GOD's `base.yml` default) — set `wandb_mode: online` + `wandb_entity` so each
   run emits a live dashboard link. `WANDB_API_KEY` via env on the box only.
+
+### Roadmap: post-SFT alignment (separate pipelines, run on the SFT checkpoint)
+
+This pipeline stops at SFT. Two follow-on stages, in order, once the 3-stage SFT
+base is benchmarked. Decide from where it plateaus: IFEval/chat weak → DPO;
+math correctness weak → RLVR. The G.O.D trainer already supports both objectives.
+
+**Stage 4 — DPO (preference).** Run on the final SFT checkpoint.
+- Data: preference pairs (prompt/chosen/rejected) — e.g.
+  `allenai/llama-3.1-tulu-3-8b-preference-mixture`, `HuggingFaceH4/ultrafeedback_binarized`.
+  New normalize adapter → `DpoDatasetType` (`field_prompt/chosen/rejected`).
+- Trainer: G.O.D `base_grpo`-style `rl: dpo` / `trl` block, full-FT, beta ~0.1.
+- Targets: chat quality, IFEval/format, general alignment.
+
+**Stage 5 — RLVR / GRPO (verifiable rewards).** Run on the DPO (or SFT) checkpoint.
+- Data: prompts with verifiable answers — math (GSM8K/MATH/AIME-style, we already
+  keep `expected_answer` in `meta`) + IFEval-style constraints. `GrpoDatasetType`
+  (`field_prompt` + `reward_functions`).
+- Reward funcs: math answer-match (parse boxed / `meta.expected_answer`), IFEval
+  constraint-satisfaction checkers.
+- Trainer: G.O.D `base_grpo` (`rl: grpo`, `trl`, `num_generations`, vLLM). Heavier
+  (generation loop). The documented fix when SFT instruction-following plateaus.
