@@ -69,3 +69,15 @@ benchmarks_to_decontaminate: [mmlu, gpqa, ifeval, gsm8k, math, aime]
 decontam:
   ngram: 8
   overlap_threshold: 0.6
+
+# Per-stage mix recipes (P7); budgets come from target_tokens above. Stages train
+# sequentially broad -> repair -> polish; within a stage the mix is globally shuffled.
+stages:
+  stage1:    # broad
+    domain_ratios: {math: 0.22, reasoning: 0.20, code: 0.13, science: 0.06, chat: 0.34, if: 0.05}
+  stage2:    # repair: IF/format + code/tool, with stage-1 replay to avoid forgetting
+    domain_ratios: {if: 0.45, code: 0.20, chat: 0.15, math: 0.10, reasoning: 0.10}
+    replay_stage1_fraction: 0.20
+  stage3:    # polish: only these sources + hardest reasoning traces
+    exclusive_sources: ["GAIR/LIMO", "simplescaling/s1K"]
+    hardest_from: ["open-r1/OpenR1-Math-220k", "open-thoughts/OpenThoughts3-1.2M"]

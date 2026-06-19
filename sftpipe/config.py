@@ -66,6 +66,7 @@ class Config(BaseModel):
     val_set_size: float = 0.05
     benchmarks_to_decontaminate: list[str]
     decontam: DecontamCfg = Field(default_factory=DecontamCfg)
+    stages: dict = Field(default_factory=dict)
 
     @property
     def active_profile(self) -> Profile:
