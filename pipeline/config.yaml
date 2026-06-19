@@ -1,0 +1,71 @@
+# sft-e2e-pipeline — global config. Model-agnostic; pick an active `profile`.
+# Never hardcode anything in code that belongs here (proportions, budgets,
+# tokenizer, seed, storage). Read this at startup.
+
+seed: 42
+curate_level: light          # light | full  (light skips heavy quality-filter + curriculum)
+
+# ---------------------------------------------------------------------------
+# Active model / training profile. Add more profiles for non-Quasar models.
+# ---------------------------------------------------------------------------
+profile: quasar
+
+profiles:
+  quasar:
+    base_model: silx-ai/Quasar-Preview     # 18B total / 2B active MoE, quasar_long
+    tokenizer_path: silx-ai/Quasar-Preview  # Quasar tokenizer, vocab 157,184
+    trust_remote_code: true
+    chat_template: chatml                    # TODO Phase 0: confirm against Quasar tokenizer_config.json
+    think_open: "<think>"
+    think_close: "</think>"
+    adapter: none                            # full fine-tune, NO LoRA (training/base_quasar_fullft.yml)
+
+# ---------------------------------------------------------------------------
+# Output schema — what the G.O.D trainer ingests (ChatTemplateDatasetType).
+# ---------------------------------------------------------------------------
+output_schema: chat_template
+chat:
+  column: conversations
+  role_field: from
+  content_field: value
+  user_reference: user
+  assistant_reference: assistant
+  system_reference: system
+
+# ---------------------------------------------------------------------------
+# Storage — S3-compatible (GOD MinIO). Creds come from env, never committed.
+# ---------------------------------------------------------------------------
+storage:
+  backend: minio
+  prefix: sft-e2e
+  bucket_env: S3_BUCKET_NAME
+  endpoint_env: S3_COMPATIBLE_ENDPOINT
+  access_key_env: S3_COMPATIBLE_ACCESS_KEY
+  secret_key_env: S3_COMPATIBLE_SECRET_KEY
+  region_env: S3_REGION
+  secure: true
+  presign_expiry_secs: 604800   # 7-day max (S3/MinIO SigV4 cap); re-sign from the object key as needed
+
+# ---------------------------------------------------------------------------
+# Staged budgets — rescaled for 4×H100 full-FT. Treat as provisional; set the
+# final numbers from a measured tokens/sec smoke run (Phase 0.4).
+# ---------------------------------------------------------------------------
+target_tokens:
+  stage1: 1_500_000_000       # broad multi-domain
+  stage2: 300_000_000         # capability repair
+  stage3: 50_000_000          # reasoning polish
+
+reasoning_off_fraction: 0.10  # empty-<think> samples
+truncated_trace_fraction: 0.04
+
+pack_len:                     # consumed by the trainer's sample_packing, not us
+  stage1: 32768
+  stage2: 8192                # smaller: protect tool-calling / format skills
+  stage3: 16384
+
+val_set_size: 0.05            # train/test split (axolotl val_set_size)
+
+benchmarks_to_decontaminate: [mmlu, gpqa, ifeval, gsm8k, math, aime]
+decontam:
+  ngram: 8
+  overlap_threshold: 0.6

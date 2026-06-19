@@ -1,0 +1,10 @@
+# Pin exact versions into requirements.lock in Phase 0.
+datasets
+huggingface_hub
+pyarrow
+datasketch
+tqdm
+pyyaml
+transformers
+minio
+pydantic>=2

@@ -1,0 +1,28 @@
+# secrets / env — NEVER commit (this repo is public)
+.env
+*.env
+.env.*
+secrets.yaml
+**/credentials*
+
+# data artifacts (large, regenerable)
+data/
+*.jsonl
+*.arrow
+*.parquet
+pipeline/state.json
+pipeline/run.log
+pipeline/benchmark_index/
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.egg-info/
+
+# model / hf cache
+.cache/
+hf_cache/
+*.safetensors

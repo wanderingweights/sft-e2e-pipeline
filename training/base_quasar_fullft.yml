@@ -1,0 +1,73 @@
+# Quasar-Preview — FULL fine-tune (NO LoRA), axolotl, for the G.O.D trainer.
+# One file per stage in practice: set base_model + datasets per stage, run
+# sequentially (stage1 -> stage2 -> stage3), each starting from the previous
+# stage's checkpoint. Do NOT add `adapter`/`lora_*` — their absence is what
+# makes this a full fine-tune.
+
+base_model: silx-ai/Quasar-Preview     # stage>=2: point at previous stage checkpoint dir
+model_type: AutoModelForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true                 # quasar_long custom arch (+ quasar-raven-fix on PYTHONPATH)
+
+# --- full fine-tune: NO adapter ---
+# (intentionally no `adapter:`, no `lora_*` keys)
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+# --- data: one stage's S3 JSONL, ChatTemplate schema {conversations:[{from,value}]} ---
+chat_template: chatml                   # TODO Phase 0: confirm Quasar's real template
+datasets:
+  - path: PLACEHOLDER_S3_URL_STAGE      # presigned MinIO url (re-sign from object key; 7-day max)
+    ds_type: json
+    type: chat_template
+    field_messages: conversations
+    message_field_role: from
+    message_field_content: value
+    roles_to_train: ["assistant"]       # loss on assistant turns only
+dataset_prepared_path:
+val_set_size: 0.05
+output_dir: ./out/quasar_stage1
+
+# --- sequence / packing ---
+sequence_len: 8192                      # memory-tight at full-FT on 4xH100; tune up if it fits
+sample_packing: false                   # TODO verify packing works with Quasar attn (fla/nope) before enabling
+pad_to_sequence_len: true
+train_on_inputs: false                  # mask prompt; loss on outputs (incl. <think>) only
+
+# --- think tokens: add ONLY if Phase 0 shows they aren't already single tokens ---
+# special_tokens:
+# tokens: ["<think>", "</think>"]
+
+# --- optimization (full-FT values, not LoRA's 2e-4) ---
+gradient_accumulation_steps: 16
+micro_batch_size: 1
+num_epochs: 2
+optimizer: adamw_torch                  # to fit 4xH100, switch to adamw_bnb_8bit (8-bit optimizer state)
+lr_scheduler: cosine
+learning_rate: 7.0e-6
+warmup_ratio: 0.03
+weight_decay: 0.0
+bf16: true
+fp16:
+tf32: false
+
+# --- memory: full-FT of 18B total needs ZeRO-3 (+ offload) on 4xH100 ---
+deepspeed: deepspeed_configs/zero3_bf16.json   # or GOD scripts/ds_config/zero3.json (add offload)
+gradient_checkpointing: true
+flash_attention: false                  # TODO verify FA compat with quasar_long; sdpa otherwise
+
+# --- checkpoint windowing for best-of selection (see RUNBOOK notes) ---
+saves_per_epoch: 4
+evals_per_epoch: 4
+save_total_limit: 12
+eval_max_new_tokens: 256
+
+# --- WANDB: ONLINE with a live link (NOT offline/silent) ---
+wandb_project: quasar-sft-e2e
+wandb_entity: subiawaud
+wandb_mode: online                      # WANDB_API_KEY via env on the box only
+wandb_run: quasar_stage1
+
+logging_steps: 1
