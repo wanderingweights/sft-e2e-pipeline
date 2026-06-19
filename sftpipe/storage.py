@@ -10,8 +10,10 @@ from __future__ import annotations
 import datetime
 import logging
 import os
+from pathlib import Path
 
 from minio import Minio
+from minio.error import S3Error
 
 from sftpipe.config import StorageCfg
 
@@ -61,6 +63,45 @@ class Storage:
 
     def public_url(self, object_key: str) -> str:
         return f"https://{self.endpoint}/{self.bucket}/{object_key}"
+
+    # --- plumbing for pushing shards / artifacts ---
+
+    def put_file(self, local_path: str | Path, object_key: str) -> None:
+        """Quiet upload (no presign), for syncing artifacts."""
+        self.client.fput_object(self.bucket, object_key, str(local_path))
+
+    def object_exists(self, object_key: str) -> bool:
+        try:
+            self.client.stat_object(self.bucket, object_key)
+            return True
+        except S3Error:
+            return False
+
+    def download_file(self, object_key: str, local_path: str | Path) -> bool:
+        local_path = Path(local_path)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.client.fget_object(self.bucket, object_key, str(local_path))
+            return True
+        except S3Error:
+            return False
+
+    def list_keys(self, prefix: str) -> list[str]:
+        return [
+            o.object_name
+            for o in self.client.list_objects(self.bucket, prefix=prefix, recursive=True)
+            if o.object_name is not None
+        ]
+
+    def sync_dir_up(self, local_dir: str | Path, key_prefix: str) -> int:
+        """Upload every file under local_dir to key_prefix/<relpath>. Returns count."""
+        local_dir = Path(local_dir)
+        n = 0
+        for p in sorted(local_dir.rglob("*")):
+            if p.is_file():
+                self.put_file(p, f"{key_prefix}/{p.relative_to(local_dir).as_posix()}")
+                n += 1
+        return n
 
 
 def _require_env(name: str) -> str:
