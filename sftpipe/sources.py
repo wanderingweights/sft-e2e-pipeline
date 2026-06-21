@@ -35,6 +35,7 @@ class SourceSpec(BaseModel):
     max_rows: int | None = None
     cols: dict[str, str] = Field(default_factory=dict)
     gated: bool = False
+    cot_prose: bool = False  # output is plain-prose chain-of-thought (no <think> tags) -> route to reasoning
 
     @property
     def name(self) -> str:
@@ -48,25 +49,25 @@ class SourceSpec(BaseModel):
 
 SOURCES: list[SourceSpec] = [
     SourceSpec(id="nvidia/OpenMathInstruct-2", kind=Kind.instruct, domain=Domain.math,
-               license="CC-BY-4.0", max_rows=1_000_000,
+               license="CC-BY-4.0", max_rows=1_000_000, cot_prose=True,
                cols={"instruction": "problem", "output": "generated_solution", "answer": "expected_answer"}),
     SourceSpec(id="open-r1/OpenR1-Math-220k", kind=Kind.openr1, domain=Domain.math,
                license="Apache-2.0",
                cols={"problem": "problem", "solution": "solution", "answer": "answer",
                      "generations": "generations", "verify": "correctness_math_verify"}),
     SourceSpec(id="AI-MO/NuminaMath-CoT", kind=Kind.instruct, domain=Domain.math,
-               license="Apache-2.0", max_rows=500_000,
+               license="Apache-2.0", max_rows=500_000, cot_prose=True,
                cols={"instruction": "problem", "output": "solution"}),
     # Nemotron-v2: one config "default", multiple splits; reasoning on/off built-in.
     # Acquire English splits per-domain (skip multilingual_* for v1).
     SourceSpec(id="nvidia/Nemotron-Post-Training-Dataset-v2", kind=Kind.messages, domain=Domain.math,
-               license="CC-BY-4.0", hf_config="default", split="math", max_rows=300_000, cols={"messages": "messages"}),
+               license="CC-BY-4.0", gated=True, hf_config="default", split="math", max_rows=300_000, cols={"messages": "messages"}),
     SourceSpec(id="nvidia/Nemotron-Post-Training-Dataset-v2", kind=Kind.messages, domain=Domain.code,
-               license="CC-BY-4.0", hf_config="default", split="code", max_rows=200_000, cols={"messages": "messages"}),
+               license="CC-BY-4.0", gated=True, hf_config="default", split="code", max_rows=200_000, cols={"messages": "messages"}),
     SourceSpec(id="nvidia/Nemotron-Post-Training-Dataset-v2", kind=Kind.messages, domain=Domain.science,
-               license="CC-BY-4.0", hf_config="default", split="stem", max_rows=150_000, cols={"messages": "messages"}),
+               license="CC-BY-4.0", gated=True, hf_config="default", split="stem", max_rows=150_000, cols={"messages": "messages"}),
     SourceSpec(id="nvidia/Nemotron-Post-Training-Dataset-v2", kind=Kind.messages, domain=Domain.chat,
-               license="CC-BY-4.0", hf_config="default", split="chat", max_rows=150_000, cols={"messages": "messages"}),
+               license="CC-BY-4.0", gated=True, hf_config="default", split="chat", max_rows=150_000, cols={"messages": "messages"}),
     SourceSpec(id="open-thoughts/OpenThoughts3-1.2M", kind=Kind.sharegpt, domain=Domain.reasoning,
                license="check-card", max_rows=400_000,
                cols={"conversations": "conversations", "domain_field": "domain"}),

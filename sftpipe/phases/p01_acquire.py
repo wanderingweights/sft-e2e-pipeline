@@ -8,6 +8,7 @@ manifests/sources.json. On 3 failed retries: mark `unavailable`, continue
 from __future__ import annotations
 
 import json
+import os
 from itertools import islice
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,15 @@ if TYPE_CHECKING:
 
 MAX_RETRIES = 3
 MANIFEST = PIPELINE_DIR / "manifests" / "sources.json"
+HF_TOKEN_ENVS = ("HF_TOKEN", "HUGGINGFACE_TOKEN", "HUGGING_FACE_HUB_TOKEN")
+
+
+def _hf_token() -> str | None:
+    for k in HF_TOKEN_ENVS:
+        v = os.environ.get(k)
+        if v:
+            return v
+    return None
 
 
 def _load() -> dict:
@@ -37,7 +47,14 @@ def run(ctx: "Ctx") -> None:
 
     hfds.logging.set_verbosity_error()
     log = ctx.logger
-    api = HfApi()
+    token = _hf_token()
+    if token:
+        log.info("acquire: using HF token from env for gated datasets")
+    else:
+        gated = [s.id for s in SOURCES if s.gated]
+        log.warning("acquire: no HF token in env (%s); gated sources will fail: %s",
+                    "/".join(HF_TOKEN_ENVS), gated or "none flagged")
+    api = HfApi(token=token)
     raw_root = ctx.data_root / "raw"
     manifest = _load()
 
@@ -56,7 +73,7 @@ def run(ctx: "Ctx") -> None:
                     sha = api.dataset_info(spec.id).sha
                 except Exception:
                     sha = None
-                it = iter(load_dataset(spec.id, spec.hf_config, split=spec.split, streaming=True))
+                it = iter(load_dataset(spec.id, spec.hf_config, split=spec.split, streaming=True, token=token))
                 if spec.max_rows:
                     it = islice(it, spec.max_rows)
                 n, cols = 0, None

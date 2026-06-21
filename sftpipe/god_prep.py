@@ -52,15 +52,30 @@ def guard_not_mostly_empty(conversations_rows: list[dict], chat: ChatCfg, max_em
 # ---------------------------------------------------------------------------
 
 def train_test_split(rows: list[dict], test_size: float, seed: int = 42) -> tuple[list[dict], list[dict]]:
+    """Dedup-aware split. P7 upsamples (repeats records) to hit token budgets, so
+    a naive index split leaks identical rows across train/test. We key on full row
+    content: every copy of a record goes to the SAME side, test holds one copy of
+    each selected record, and train keeps the upsampled copies. Diverges from GOD's
+    naive split deliberately — a leak-free held-out set matters more than parity."""
     import random
 
+    if not rows:
+        return [], []
+    keys = [json.dumps(r, sort_keys=True, ensure_ascii=False) for r in rows]
+    unique = list(dict.fromkeys(keys))  # order-preserving dedup
     rng = random.Random(seed)
-    idx = list(range(len(rows)))
-    rng.shuffle(idx)
-    n_test = max(1, int(len(rows) * test_size)) if rows else 0
-    test_idx = set(idx[:n_test])
-    train = [rows[i] for i in idx[n_test:]]
-    test = [rows[i] for i in sorted(test_idx)]
+    rng.shuffle(unique)
+    n_test = max(1, int(len(unique) * test_size))
+    test_keys = set(unique[:n_test])
+
+    train, test, seen_test = [], [], set()
+    for row, key in zip(rows, keys):
+        if key in test_keys:
+            if key not in seen_test:  # one copy per record in test
+                test.append(row)
+                seen_test.add(key)
+        else:
+            train.append(row)  # keep upsampled duplicates in train
     return train, test
 
 

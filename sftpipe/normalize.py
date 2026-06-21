@@ -37,7 +37,56 @@ def split_think(text: str) -> tuple[str | None, str]:
         reasoning = m.group(1).strip()
         answer = m.group(2).strip()
         return (reasoning or None), (answer or text.strip())
+    # Unterminated <think> with no closing tag (~62% of OpenThoughts3 traces are
+    # truncated): treat the post-<think> body as reasoning and use its last
+    # paragraph as the answer, so the record isn't hollowed out / corrupted.
+    oi = text.lower().find("<think>")
+    if oi != -1:
+        body = text[oi + len("<think>"):].strip()
+        paras = [p.strip() for p in body.split("\n\n") if p.strip()]
+        if len(paras) > 1:
+            return "\n\n".join(paras[:-1]), paras[-1]
+        return (body or None), (body or "")
     return None, text.strip()
+
+
+def _extract_boxed(text: str) -> str | None:
+    """Return the contents of the LAST \\boxed{...} (brace-balanced), else None."""
+    idx = text.rfind("\\boxed{")
+    if idx == -1:
+        return None
+    i = idx + len("\\boxed{")
+    depth, out = 1, []
+    while i < len(text):
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return "".join(out).strip() or None
+        out.append(ch)
+        i += 1
+    return None  # unbalanced
+
+
+def split_prose_cot(text: str, expected_answer: str | None = None) -> tuple[str | None, str]:
+    """For sources whose chain-of-thought is plain prose (no <think> tags), treat
+    the whole solution as reasoning and synthesize a concise final-answer line.
+
+    answer preference: explicit expected_answer -> last \\boxed{} -> last paragraph.
+    If none of those yield a split, fall back to (None, text) so the record is
+    rendered as a direct answer rather than fabricating reasoning."""
+    text = (text or "").strip()
+    if not text:
+        return None, ""
+    ans = str(expected_answer).strip() if expected_answer not in (None, "") else _extract_boxed(text)
+    if ans:
+        return text, f"The final answer is $\\boxed{{{ans}}}$."
+    paras = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if len(paras) > 1:
+        return "\n\n".join(paras[:-1]), paras[-1]
+    return None, text
 
 
 def _native_id(row: dict, idx: int) -> str:
@@ -62,12 +111,16 @@ def _instruct(spec, row, idx):
     c = spec.cols
     instruction = str(row.get(c["instruction"], "") or "")
     output = str(row.get(c["output"], "") or "")
+    expected = row.get(c["answer"]) if "answer" in c else None
     reasoning, answer = split_think(output)
+    if reasoning is None and spec.cot_prose:
+        # plain-prose CoT (no <think> tags): route the working into reasoning
+        reasoning, answer = split_prose_cot(output, expected)
     msgs = [Message(role=Role.user, content=instruction),
             Message(role=Role.assistant, content=answer, reasoning=reasoning)]
     rec = _rec(spec, _native_id(row, idx), instruction, msgs)
-    if rec and "answer" in c and row.get(c["answer"]) is not None:
-        rec.meta["expected_answer"] = str(row[c["answer"]])
+    if rec and expected is not None:
+        rec.meta["expected_answer"] = str(expected)
     return rec
 
 

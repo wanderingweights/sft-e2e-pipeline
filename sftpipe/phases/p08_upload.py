@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from sftpipe.god_prep import guard_not_mostly_empty, train_test_split, write_jsonl
+from sftpipe.god_prep import guard_not_mostly_empty, train_test_split
 from sftpipe.schema import CanonicalRecord, ReasoningMode, to_conversations
 from sftpipe.state import PIPELINE_DIR
 
@@ -50,13 +50,16 @@ def run(ctx: "Ctx") -> None:
         train, test = train_test_split(rows, cfg.val_set_size, cfg.seed)
 
         stage_dir = mixed / stage
-        train_path, test_path = stage_dir / "train.jsonl", stage_dir / "test.jsonl"
-        write_jsonl(train, train_path)
-        write_jsonl(test, test_path)
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Standard JSON array (not JSONL): the G.O.D trainer reads datasets with
+        # json.load(), so an array loads directly — no line-parse / truncation risk.
+        train_path, test_path = stage_dir / "train.json", stage_dir / "test.json"
+        train_path.write_text(json.dumps(train, ensure_ascii=False))
+        test_path.write_text(json.dumps(test, ensure_ascii=False))
 
         base = storage.object_key(cfg.profile, stage)
-        train_key = storage.upload_file(str(train_path), f"{base}/train.jsonl")
-        test_key = storage.upload_file(str(test_path), f"{base}/test.jsonl")
+        train_key = storage.upload_file(str(train_path), f"{base}/train.json")
+        test_key = storage.upload_file(str(test_path), f"{base}/test.json")
         manifest[stage] = {
             "bucket": storage.bucket,
             "train_key": train_key, "test_key": test_key,
