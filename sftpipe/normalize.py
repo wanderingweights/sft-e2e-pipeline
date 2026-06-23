@@ -80,7 +80,12 @@ def split_prose_cot(text: str, expected_answer: str | None = None) -> tuple[str 
     text = (text or "").strip()
     if not text:
         return None, ""
-    ans = str(expected_answer).strip() if expected_answer not in (None, "") else _extract_boxed(text)
+    # NuminaMath et al. use sentinels ("proof", "notfound") for non-numeric answers;
+    # don't box those — fall back to \boxed{} in the text, then the last paragraph.
+    exp = str(expected_answer).strip() if expected_answer not in (None, "") else ""
+    if exp.lower() in {"proof", "notfound", "none", "n/a"}:
+        exp = ""
+    ans = exp or _extract_boxed(text)
     if ans:
         return text, f"The final answer is $\\boxed{{{ans}}}$."
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
@@ -121,6 +126,11 @@ def _instruct(spec, row, idx):
     rec = _rec(spec, _native_id(row, idx), instruction, msgs)
     if rec and expected is not None:
         rec.meta["expected_answer"] = str(expected)
+    if rec and "pass_rate" in c and row.get(c["pass_rate"]) is not None:
+        try:  # difficulty signal for the curriculum (lower pass_rate = harder)
+            rec.meta["pass_rate"] = float(row[c["pass_rate"]])
+        except (TypeError, ValueError):
+            pass
     return rec
 
 

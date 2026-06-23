@@ -69,7 +69,7 @@ benchmarks_to_decontaminate: [mmlu, gpqa, ifeval, gsm8k, math, aime]
 
 # tournament packaging (p11_chunk_tourn): slice each stage mix into N-row chunks,
 # each pre-split train/test, one chunk -> one tournament task.
-tourn_chunk_rows: 150000
+tourn_chunk_rows: 100000   # chunk each stage into 100k-row pieces, each pre-split train/test
 decontam:
   ngram: 8
   overlap_threshold: 0.6
@@ -77,11 +77,16 @@ decontam:
 # Per-stage mix recipes (P7); budgets come from target_tokens above. Stages train
 # sequentially broad -> repair -> polish; within a stage the mix is globally shuffled.
 stages:
-  stage1:    # broad
-    domain_ratios: {math: 0.26, reasoning: 0.24, code: 0.12, science: 0.06, chat: 0.27, if: 0.05}  # reasoning(=math+reasoning)~50%, chat~27%, code~12%, sci~6%, IF~5%
+  stage1:    # broad. NO `reasoning` bucket: OpenThoughts3 self-labels each row's domain and the
+             # loader remaps it into math/code/science, so a `reasoning` ratio goes unfilled. Its
+             # budget is folded into math/code/science (where the trace data actually lands).
+             # Reasoning-tilted for MATH/AIME/LiveCodeBench. Budget is a sweep knob:
+             # SFT_STAGE1_TOKENS=3e9 / 5e9 to find the benchmark knee. TUNABLE.
+    domain_ratios: {math: 0.30, code: 0.26, science: 0.12, chat: 0.22, if: 0.10}
   stage2:    # repair: IF/format + code/tool regressions, with stage-1 replay to avoid forgetting
-    domain_ratios: {code: 0.30, math: 0.15, reasoning: 0.15, chat: 0.16, if: 0.12, tool: 0.12}  # IF capped to persona-IF capacity (~12%)
+    domain_ratios: {code: 0.34, math: 0.22, chat: 0.18, if: 0.14, tool: 0.12}  # reasoning folded into code/math
     replay_stage1_fraction: 0.20
   stage3:    # polish: only these sources + hardest reasoning traces
     exclusive_sources: ["GAIR/LIMO", "simplescaling/s1K"]
-    hardest_from: ["open-r1/OpenR1-Math-220k", "open-thoughts/OpenThoughts3-1.2M"]
+    hardest_from: ["open-thoughts/OpenThoughts3-1.2M"]            # length-hardest reasoning traces
+    hardest_by_passrate: ["nvidia/OpenMathReasoning"]             # pass_rate-hardest math (curriculum)

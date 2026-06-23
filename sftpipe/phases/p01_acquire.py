@@ -74,8 +74,11 @@ def run(ctx: "Ctx") -> None:
                 except Exception:
                     sha = None
                 it = iter(load_dataset(spec.id, spec.hf_config, split=spec.split, streaming=True, token=token))
-                if spec.max_rows:
-                    it = islice(it, spec.max_rows)
+                # SFT_SMOKE_MAX_ROWS caps every source for fast end-to-end smoke runs.
+                smoke = os.environ.get("SFT_SMOKE_MAX_ROWS")
+                limit = min(spec.max_rows or 10**12, int(smoke)) if smoke else spec.max_rows
+                if limit:
+                    it = islice(it, limit)
                 n, cols = 0, None
                 with open(out, "w") as f:
                     for row in it:

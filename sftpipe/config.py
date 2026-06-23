@@ -5,6 +5,7 @@ through these models so we never hardcode proportions, budgets or tokenizer.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -77,4 +78,11 @@ class Config(BaseModel):
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     with open(path) as f:
         raw = yaml.safe_load(f)
-    return Config.model_validate(raw)
+    cfg = Config.model_validate(raw)
+    # Sweep knob: override per-stage token budgets from env without editing YAML,
+    # e.g. SFT_STAGE1_TOKENS=3e9 for the 1.5B->3B->5B scaling sweep.
+    for stage in list(cfg.target_tokens):
+        env = os.environ.get(f"SFT_{stage.upper()}_TOKENS")
+        if env:
+            cfg.target_tokens[stage] = int(float(env))
+    return cfg

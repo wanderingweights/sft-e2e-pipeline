@@ -14,6 +14,11 @@ pipeline/state.json
 pipeline/run.log
 pipeline/benchmark_index/
 
+# NEVER commit (repo is public): these hold presigned TEST-set links -> miner leak vector
+links.json
+links.txt
+pipeline/manifests/
+
 # python
 .venv/
 venv/

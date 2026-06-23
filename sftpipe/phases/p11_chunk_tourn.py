@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from sftpipe.god_prep import train_test_split, write_jsonl
+from sftpipe.god_prep import train_test_split
 from sftpipe.schema import CanonicalRecord, ReasoningMode, to_conversations
 from sftpipe.state import PIPELINE_DIR
 
@@ -35,15 +35,18 @@ def run(ctx: "Ctx") -> None:
 
     def flush(buf: list[dict], stage: str, ci: int) -> dict:
         train, test = train_test_split(buf, cfg.val_set_size, cfg.seed)
-        cdir = mixed / "tourn" / stage / f"chunk-{ci:05d}"
-        tp, ep = cdir / "train.jsonl", cdir / "test.jsonl"
-        write_jsonl(train, tp)
-        write_jsonl(test, ep)
-        base = storage.object_key(cfg.profile, "tourn-chunks", stage, f"chunk-{ci:05d}")
-        tk = storage.upload_file(str(tp), f"{base}/train.jsonl")
-        ek = storage.upload_file(str(ep), f"{base}/test.jsonl")
+        cdir = mixed / stage / "chunks" / f"chunk-{ci:05d}"
+        cdir.mkdir(parents=True, exist_ok=True)
+        # JSON arrays (match p08 / the G.O.D trainer's json.load), each chunk leak-free.
+        tp, ep = cdir / "train.json", cdir / "test.json"
+        tp.write_text(json.dumps(train, ensure_ascii=False))
+        ep.write_text(json.dumps(test, ensure_ascii=False))
+        base = storage.object_key(cfg.profile, stage, "chunks", f"chunk-{ci:05d}")
+        tk = storage.upload_file(str(tp), f"{base}/train.json")
+        ek = storage.upload_file(str(ep), f"{base}/test.json")
         log.info("%s chunk-%05d: %d train / %d test -> %s", stage, ci, len(train), len(test), base)
-        return {"train_key": tk, "test_key": ek, "n_train": len(train), "n_test": len(test)}
+        return {"train_key": tk, "test_key": ek, "n_train": len(train), "n_test": len(test),
+                "train_url": storage.presigned_url(tk), "test_url": storage.presigned_url(ek)}
 
     for stage in STAGES:
         src = mixed / f"{stage}.jsonl"

@@ -50,7 +50,8 @@ def check(ctx: "Ctx") -> bool:
     mixture = json.loads((MAN / "mixture.json").read_text()) if (MAN / "mixture.json").exists() else {}
     for stage, recipe in ctx.cfg.stages.items():
         ratios = recipe.get("domain_ratios", {})
-        realized = mixture.get(stage, {}).get("domain_share", {})
+        by_domain = mixture.get(stage, {}).get("by_domain", {})
+        realized = {dom: stats.get("token_share", 0.0) for dom, stats in by_domain.items()}
         for dom, want in ratios.items():
             got = realized.get(dom, 0.0)
             if abs(got - want) > 0.02:

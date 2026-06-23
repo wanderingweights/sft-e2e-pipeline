@@ -29,7 +29,7 @@ def _expects_reasoning(spec) -> bool:
     """Sources that MUST carry chain-of-thought: explicit reasoning kinds + the
     plain-prose-CoT instruct sources. A regression here (e.g. a CoT field that
     stops parsing) silently produces empty-<think>, so we fail loud instead."""
-    return spec.cot_prose or spec.kind in (Kind.openr1, Kind.s1k, Kind.limo)
+    return spec.cot_prose or spec.reasoning_trace or spec.kind in (Kind.openr1, Kind.s1k, Kind.limo)
 
 
 def _rand(rid: str, seed: int) -> float:
